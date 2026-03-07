@@ -6,9 +6,8 @@
   config_schema: {
     type: "object",
     properties: {
-      my_api_key: { type: "string", secret: true },
     },
-    required: ["my_api_key"],
+    required: [],
     additionalProperties: false,
   },
 
@@ -20,12 +19,11 @@
   // Runtime configuration
   program: {
     // TODO: Replace with your docker image
-    image: "ghcr.io/<your-username>/<your-repo-name>:latest",
+    image: "ghcr.io/rdi-foundation/osworld-green:latest",
     entrypoint: "uv run python src/server.py --host 0.0.0.0 --port 9009",
 
     // TODO: Pass config values as environment variables
     env: {
-      MY_API_KEY: "${config.my_api_key}",
     },
 
     network: {
@@ -45,7 +43,14 @@
 
   // TODO: Describe the assessment request your green agent receives
   metadata: {
-    assessment_config: {}, // replace with your default assessment parameters, e.g. {"num_rounds": 2}
-    participant_roles: [], // list the roles your green agent expects, e.g. ["pro_debater", "con_debater"]
+    assessment_config: {
+      action_space: "pyautogui",
+      observation_type: "screenshot",
+      sleep_after_execution: 0.0,
+      max_steps: 15,
+      domain: "osworld",
+      example_id: "example",
+    }, // replace with your default assessment parameters, e.g. {"num_rounds": 2}
+    participant_roles: ["agent"], // list the roles your green agent expects, e.g. ["pro_debater", "con_debater"]
   },
 }
