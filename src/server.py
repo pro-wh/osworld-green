@@ -26,7 +26,7 @@ def main():
     skill = AgentSkill(
         id="osworld_eval",
         name="OSWorld Evaluation",
-        description="Runs an example from OSWorld.",
+        description="Runs OSWorld.",
         tags=["osworld", "evaluation", "desktop"],
         examples=[
             """
@@ -35,8 +35,7 @@ def main():
                         "agent": "http://localhost:9010/"
                     },
                     "config": {
-                        "domain": "os",
-                        "example_id": "5ced85fc-fa1a-4217-95fd-0fb530545ce2"
+                        "test_all_meta_name": "test_small"
                     }
                 }
             """,
@@ -45,7 +44,7 @@ def main():
 
     agent_card = AgentCard(
         name="OSWorld Green Agent",
-        description="Runs an example from OSWorld.",
+        description="Runs an OSWorld evaluation.",
         url=args.card_url or f"http://{args.host}:{args.port}/",
         version='1.0.0',
         default_input_modes=['text'],

@@ -113,7 +113,7 @@ class Agent:
     # Fill in: list of required participant roles, e.g. ["pro_debater", "con_debater"]
     required_roles: list[str] = ["agent"]
     # Fill in: list of required config keys, e.g. ["topic", "num_rounds"]
-    required_config_keys: list[str] = ["domain", "example_id"]
+    required_config_keys: list[str] = []
 
     def __init__(self):
         self.messenger = Messenger()
@@ -162,18 +162,8 @@ class Agent:
         require_a11y_tree = observation_type in ["a11y_tree", "screenshot_a11y_tree", "som"]
         sleep_after_execution = request.config.get("sleep_after_execution", 0.0)
         max_steps = request.config.get("max_steps", 15)
-        domain = request.config["domain"]
-        example_id = request.config["example_id"]
-
-        config_file = os.path.join(EXAMPLES_DIR, f"examples/{domain}/{example_id}.json")
-        with open(config_file, "r", encoding="utf-8") as f:
-            example = json.load(f)
-
-        example_result_dir = os.path.join(RESULTS_DIR, domain, example_id)
-        os.makedirs(example_result_dir, exist_ok=True)
 
         agent_url = str(request.participants["agent"])
-        scores: list[float] = []
 
         args = argparse.Namespace(
             sleep_after_execution=sleep_after_execution,
@@ -184,7 +174,16 @@ class Agent:
             TaskState.working, new_agent_text_message("Running evaluation...")
         )
 
-        def do_blocking() -> None:
+        test_all_meta_name = request.config.get("test_all_meta_name", "test_nogdrive")
+        test_all_meta_name_path = os.path.join(EXAMPLES_DIR, f"{test_all_meta_name}.json")
+        with open(test_all_meta_name_path, "r", encoding="utf-8") as f:
+            tasks: dict[str, list[str]] = json.load(f)
+
+        total = sum(len(ids) for ids in tasks.values())
+        loop = asyncio.get_event_loop()
+
+        def do_blocking() -> dict[str, list[float]]:
+            completed = 0
             agent = A2AClientAgent(url=agent_url)
             # Hardcoded env config for our container setup
             env = DesktopEnv(
@@ -193,28 +192,53 @@ class Agent:
                 headless=True,
                 require_a11y_tree=require_a11y_tree,
             )
+            domain_scores: dict[str, list[float]] = {}
             try:
-                lib_run_single.run_single_example(
-                    agent,
-                    env,
-                    example,
-                    max_steps,
-                    example["instruction"],
-                    args,
-                    example_result_dir,
-                    scores,
-                )
+                for domain, example_ids in tasks.items():
+                    domain_scores[domain] = []
+                    for example_id in example_ids:
+                        config_file = os.path.join(EXAMPLES_DIR, f"examples/{domain}/{example_id}.json")
+                        with open(config_file, "r", encoding="utf-8") as f:
+                            example = json.load(f)
+                        example_result_dir = os.path.join(RESULTS_DIR, domain, example_id)
+                        os.makedirs(example_result_dir, exist_ok=True)
+                        scores: list[float] = []
+                        lib_run_single.run_single_example(
+                            agent,
+                            env,
+                            example,
+                            max_steps,
+                            example["instruction"],
+                            args,
+                            example_result_dir,
+                            scores,
+                        )
+                        score = scores[0] if scores else 0.0
+                        domain_scores[domain].append(score)
+                        completed += 1
+                        asyncio.run_coroutine_threadsafe(
+                            updater.update_status(
+                                TaskState.working,
+                                new_agent_text_message(f"[{completed}/{total}] {domain}/{example_id}: {score:.2f}"),
+                            ),
+                            loop,
+                        ).result()
             finally:
                 env.close()
+            return domain_scores
 
-        await asyncio.to_thread(do_blocking)
+        domain_scores = await asyncio.to_thread(do_blocking)
 
-        result = scores[0] if scores else 0.0
+        all_scores = [s for ss in domain_scores.values() for s in ss]
+        overall = sum(all_scores) / len(all_scores) if all_scores else 0.0
+        per_domain = {d: sum(ss) / len(ss) if ss else 0.0 for d, ss in domain_scores.items()}
+
         await updater.add_artifact(
             parts=[
                 Part(root=DataPart(data={
                     # structured assessment results
-                    "result": result,
+                    "overall": overall,
+                    "per_domain": per_domain,
                 }))
             ],
             name="Result",
