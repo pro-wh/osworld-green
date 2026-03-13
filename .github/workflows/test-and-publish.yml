@@ -23,6 +23,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Checkout osworld-qemu
+        uses: actions/checkout@v4
+        with:
+          repository: pro-wh/osworld-qemu
+          ref: pro-wh/dev
+          path: osworld
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
