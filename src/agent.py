@@ -5,6 +5,8 @@ import json
 import os
 import queue
 import sys
+import sys
+import traceback
 from typing import Any
 from pydantic import BaseModel, HttpUrl, ValidationError
 from uuid import uuid4
@@ -216,16 +218,24 @@ class Agent:
                     example_result_dir = os.path.join(RESULTS_DIR, domain, example_id)
                     os.makedirs(example_result_dir, exist_ok=True)
                     scores: list[float] = []
-                    lib_run_single.run_single_example(
-                        agent,
-                        env,
-                        example,
-                        max_steps,
-                        example["instruction"],
-                        args,
-                        example_result_dir,
-                        scores,
-                    )
+                    try:
+                        lib_run_single.run_single_example(
+                            agent,
+                            env,
+                            example,
+                            max_steps,
+                            example["instruction"],
+                            args,
+                            example_result_dir,
+                            scores,
+                        )
+                    except Exception as e:
+                        print(f"Error in {domain}/{example_id}:")
+                        traceback.print_exc(file=sys.stdout)
+                        asyncio.run_coroutine_threadsafe(
+                            updater.update_status(TaskState.working, new_agent_text_message(f"Error in {domain}/{example_id}: {e}")),
+                            loop,
+                        ).result()
                     score = scores[0] if scores else 0.0
 
                     async def record() -> None:
