@@ -18,7 +18,7 @@ from a2a.types import (DataPart, FilePart, FileWithBytes, Message, Part, Role,
                        Task, TaskState, TextPart)
 from a2a.utils import get_message_text, new_agent_text_message
 
-from messenger import Messenger
+from messenger import DEFAULT_TIMEOUT, Messenger
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../osworld"))
 import lib_run_single
@@ -77,7 +77,7 @@ class A2AClientAgent:
             message_id=uuid4().hex,
             context_id=self._context_id,
         )
-        async with httpx.AsyncClient() as httpx_client:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as httpx_client:
             resolver = A2ACardResolver(httpx_client=httpx_client, base_url=self._url)
             card = await resolver.get_agent_card()
             client = ClientFactory(ClientConfig(httpx_client=httpx_client)).create(card)
