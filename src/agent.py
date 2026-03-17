@@ -42,9 +42,10 @@ class A2AClientAgent:
       - DataPart: {"actions": list[str]}
     """
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, env_config: dict):
         self._url = url
         self._context_id: str | None = None
+        self._env_config = env_config
 
     def reset(self, _logger: Any = None, vm_ip: Any = None, **kwargs: Any) -> None:
         # Generate a fresh context_id so the server treats this as a new task
@@ -59,6 +60,7 @@ class A2AClientAgent:
             screenshot = base64.b64encode(screenshot).decode("ascii")
 
         parts: list[Part] = [Part(root=TextPart(text=instruction))]
+        parts.append(Part(root=DataPart(data={"env_config": self._env_config})))
         if screenshot:
             parts.append(Part(root=FilePart(
                 file=FileWithBytes(bytes=screenshot, mime_type="image/png"),
@@ -197,8 +199,15 @@ class Agent:
 
         results: list[tuple[str, str, float]] = []
 
+        # Environment-specific params passed to the purple agent.
+        # These are based on PromptAgent.__init__ params.
+        env_config = {
+            "action_space": action_space,
+            "observation_type": observation_type,
+        }
+
         def run_worker() -> None:
-            agent = A2AClientAgent(url=agent_url)
+            agent = A2AClientAgent(url=agent_url, env_config=env_config)
             # Hardcoded env config for our container setup
             env = DesktopEnv(
                 provider_name="qemu",
