@@ -190,11 +190,19 @@ class Agent:
             for domain, eids in tasks.items()
             for eid in eids
         ]
-        total = len(all_examples)
+
+        # Shard using round-robin. We imagine that different domains have
+        # different distributions of how long the examples take, and this
+        # makes sure we spread out each domain.
+        shard_index = request.config.get("shard_index", 0)
+        num_shards = request.config.get("num_shards", 1)
+        shard_examples = all_examples[shard_index::num_shards]
+
+        total = len(shard_examples)
         loop = asyncio.get_event_loop()
 
         work_queue: queue.SimpleQueue[tuple[str, str]] = queue.SimpleQueue()
-        for item in all_examples:
+        for item in shard_examples:
             work_queue.put(item)
 
         results: list[tuple[str, str, float]] = []
@@ -265,13 +273,13 @@ class Agent:
             domain_scores.setdefault(domain, []).append(score)
 
         all_scores = [s for ss in domain_scores.values() for s in ss]
-        overall = sum(all_scores) / len(all_scores) if all_scores else 0.0
-        per_domain = {d: sum(ss) / len(ss) if ss else 0.0 for d, ss in domain_scores.items()}
+        overall = {"sum": sum(all_scores), "count": len(all_scores)}
+        per_domain = {d: {"sum": sum(ss), "count": len(ss)} for d, ss in domain_scores.items()}
 
         await updater.add_artifact(
             parts=[
                 Part(root=DataPart(data={
-                    # structured assessment results
+                    # structured assessment results, as sum/count so shards can be combined
                     "overall": overall,
                     "per_domain": per_domain,
                 }))
