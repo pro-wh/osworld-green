@@ -170,6 +170,8 @@ class Agent:
         test_all_meta_name = request.config.get("test_all_meta_name", "test_nogdrive")
         test_all_meta_name_path = os.path.join(EXAMPLES_DIR, f"{test_all_meta_name}.json")
         num_workers = request.config.get("num_workers", 3)
+        shard_index = request.config.get("shard_index", 0)
+        num_shards = request.config.get("num_shards", 1)
 
         agent_url = str(request.participants["agent"])
 
@@ -194,8 +196,6 @@ class Agent:
         # Shard using round-robin. We imagine that different domains have
         # different distributions of how long the examples take, and this
         # makes sure we spread out each domain.
-        shard_index = request.config.get("shard_index", 0)
-        num_shards = request.config.get("num_shards", 1)
         shard_examples = all_examples[shard_index::num_shards]
 
         total = len(shard_examples)
